@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#1a2332">
+  <title>HITO Journal</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.svg">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- Setup Screen -->
+  <div id="setup-screen" class="screen" style="display:none;">
+    <div class="setup-container">
+      <h1>HITO Journal</h1>
+      <p class="setup-desc">GitHubリポジトリと連携して日記を管理します。</p>
+      <form id="setup-form">
+        <label>
+          GitHub Personal Access Token
+          <input type="password" id="setup-token" required
+                 placeholder="ghp_xxxxxxxxxxxx">
+          <small>Settings → Developer settings → Personal access tokens → Fine-grained tokens で作成。repo権限が必要です。</small>
+        </label>
+        <label>
+          リポジトリ（owner/repo）
+          <input type="text" id="setup-repo" required
+                 placeholder="例: gotouhitoshi/journal">
+        </label>
+        <label>
+          日記フォルダのパス
+          <input type="text" id="setup-path" value="entries"
+                 placeholder="例: entries">
+          <small>リポジトリ内の日記エントリが保存されるフォルダ</small>
+        </label>
+        <button type="submit" class="btn-primary">接続する</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Main App -->
+  <div id="app" class="screen" style="display:none;">
+    <!-- Header -->
+    <header id="app-header">
+      <div class="header-left">
+        <button id="btn-menu" class="icon-btn" aria-label="メニュー">☰</button>
+        <h1 class="app-title">HITO Journal</h1>
+      </div>
+      <div class="header-right">
+        <button id="btn-search" class="icon-btn" aria-label="検索">🔍</button>
+        <button id="btn-today" class="icon-btn" aria-label="今日">📅</button>
+        <button id="btn-settings" class="icon-btn" aria-label="設定">⚙</button>
+      </div>
+    </header>
+
+    <!-- Search Bar (hidden by default) -->
+    <div id="search-bar" class="search-bar" style="display:none;">
+      <input type="text" id="search-input" placeholder="キーワードで検索...">
+      <button id="btn-search-close" class="icon-btn">✕</button>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav id="nav-tabs">
+      <button class="tab active" data-view="calendar">カレンダー</button>
+      <button class="tab" data-view="list">一覧</button>
+      <button class="tab" data-view="tags">タグ</button>
+    </nav>
+
+    <!-- Views -->
+    <main id="main-content">
+      <!-- Calendar View -->
+      <div id="view-calendar" class="view active">
+        <div class="calendar-header">
+          <button id="btn-prev-month" class="icon-btn">◀</button>
+          <h2 id="calendar-title"></h2>
+          <button id="btn-next-month" class="icon-btn">▶</button>
+        </div>
+        <div class="calendar-weekdays">
+          <span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span>
+        </div>
+        <div id="calendar-grid" class="calendar-grid"></div>
+      </div>
+
+      <!-- List View -->
+      <div id="view-list" class="view">
+        <div id="entry-list" class="entry-list"></div>
+      </div>
+
+      <!-- Tag View -->
+      <div id="view-tags" class="view">
+        <div id="tag-cloud" class="tag-cloud"></div>
+        <div id="tag-results" class="entry-list"></div>
+      </div>
+
+      <!-- Search Results -->
+      <div id="view-search" class="view">
+        <div id="search-results" class="entry-list"></div>
+      </div>
+    </main>
+
+    <!-- FAB: New Entry -->
+    <button id="btn-new-entry" class="fab" aria-label="新しい日記を書く">✏️</button>
+  </div>
+
+  <!-- Editor Modal -->
+  <div id="editor-modal" class="modal" style="display:none;">
+    <div class="modal-content editor-content">
+      <div class="editor-header">
+        <button id="btn-editor-back" class="icon-btn">← 戻る</button>
+        <span id="editor-date-display"></span>
+        <button id="btn-editor-save" class="btn-primary btn-sm">保存</button>
+      </div>
+      <div class="editor-meta">
+        <label>
+          タグ（カンマ区切り）
+          <input type="text" id="editor-tags" placeholder="仕事, 学び, アイデア">
+        </label>
+        <label>
+          気分
+          <select id="editor-mood">
+            <option value="">--</option>
+            <option value="great">😊 とても良い</option>
+            <option value="good">🙂 良い</option>
+            <option value="neutral">😐 普通</option>
+            <option value="bad">😞 いまいち</option>
+            <option value="terrible">😢 つらい</option>
+          </select>
+        </label>
+      </div>
+      <div class="editor-body">
+        <div class="editor-tabs">
+          <button class="editor-tab active" data-mode="edit">編集</button>
+          <button class="editor-tab" data-mode="preview">プレビュー</button>
+        </div>
+        <textarea id="editor-textarea" placeholder="今日はどんな一日でしたか？"></textarea>
+        <div id="editor-preview" class="editor-preview" style="display:none;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Entry Viewer Modal -->
+  <div id="viewer-modal" class="modal" style="display:none;">
+    <div class="modal-content viewer-content">
+      <div class="viewer-header">
+        <button id="btn-viewer-back" class="icon-btn">← 戻る</button>
+        <span id="viewer-date-display"></span>
+        <button id="btn-viewer-edit" class="btn-primary btn-sm">編集</button>
+      </div>
+      <div id="viewer-tags" class="viewer-tags"></div>
+      <div id="viewer-body" class="viewer-body"></div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settings-modal" class="modal" style="display:none;">
+    <div class="modal-content settings-content">
+      <div class="settings-header">
+        <button id="btn-settings-back" class="icon-btn">← 戻る</button>
+        <h2>設定</h2>
+      </div>
+      <form id="settings-form">
+        <label>
+          GitHub Token
+          <input type="password" id="settings-token">
+        </label>
+        <label>
+          リポジトリ
+          <input type="text" id="settings-repo">
+        </label>
+        <label>
+          日記フォルダのパス
+          <input type="text" id="settings-path">
+        </label>
+        <button type="submit" class="btn-primary">保存</button>
+        <button type="button" id="btn-clear-cache" class="btn-secondary">キャッシュをクリア</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Loading Overlay -->
+  <div id="loading" class="loading-overlay" style="display:none;">
+    <div class="spinner"></div>
+    <p id="loading-text">読み込み中...</p>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast" style="display:none;"></div>
+
+  <script src="js/markdown.js"></script>
+  <script src="js/github.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    }
+  </script>
+</body>
+</html>
