@@ -7,7 +7,7 @@
   // ---- State ----
   let github = null;
   let entries = new Map(); // dateStr -> { meta, body, path, sha }
-  let currentView = 'calendar';
+  let currentView = 'dashboard';
   let calendarDate = new Date(); // current month being displayed
   let activeTag = null;
 
@@ -148,6 +148,7 @@
         }
       }
 
+      renderDashboard();
       renderCalendar();
       renderList();
       renderTags();
@@ -157,6 +158,133 @@
       showToast(`読み込みエラー: ${err.message}`, 'error');
       console.error(err);
     }
+  }
+
+  // ---- Dashboard ----
+
+  function renderDashboard() {
+    renderDashStats();
+    renderDashHeatmap();
+    renderDashTopTags();
+    renderDashRecent();
+  }
+
+  function renderDashStats() {
+    const total = entries.size;
+    const now = new Date();
+    const thisMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    let thisMonth = 0;
+    for (const dateStr of entries.keys()) {
+      if (dateStr.startsWith(thisMonthKey)) thisMonth++;
+    }
+
+    // Calculate streak
+    const streak = calcStreak();
+
+    $('#dash-stats').innerHTML = `
+      <div class="dash-stat-card">
+        <div class="dash-stat-value">${total}</div>
+        <div class="dash-stat-label">総エントリ数</div>
+      </div>
+      <div class="dash-stat-card">
+        <div class="dash-stat-value">${thisMonth}</div>
+        <div class="dash-stat-label">今月の記録</div>
+      </div>
+      <div class="dash-stat-card">
+        <div class="dash-stat-value">${streak}</div>
+        <div class="dash-stat-label">連続日数</div>
+      </div>
+    `;
+  }
+
+  function calcStreak() {
+    const sorted = [...entries.keys()].sort().reverse();
+    if (sorted.length === 0) return 0;
+
+    let streak = 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Start from today or yesterday
+    let check = new Date(today);
+    if (!entries.has(formatDateStr(check))) {
+      check.setDate(check.getDate() - 1);
+      if (!entries.has(formatDateStr(check))) return 0;
+    }
+
+    while (entries.has(formatDateStr(check))) {
+      streak++;
+      check.setDate(check.getDate() - 1);
+    }
+    return streak;
+  }
+
+  function renderDashHeatmap() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`;
+
+    const el = $('#dash-heatmap');
+    let html = '<div class="heatmap-grid">';
+    for (let d = 1; d <= daysInMonth; d++) {
+      const ds = `${monthKey}-${String(d).padStart(2, '0')}`;
+      const has = entries.has(ds);
+      const isToday = ds === formatDateStr(now);
+      let cls = 'heatmap-cell';
+      if (has) cls += ' filled';
+      if (isToday) cls += ' today';
+      html += `<div class="${cls}" title="${ds}">${d}</div>`;
+    }
+    html += '</div>';
+
+    // Rate
+    let count = 0;
+    for (const k of entries.keys()) {
+      if (k.startsWith(monthKey)) count++;
+    }
+    const todayDate = now.getDate();
+    const rate = todayDate > 0 ? Math.round((count / todayDate) * 100) : 0;
+    html += `<div class="heatmap-rate">${rate}% の日に記録</div>`;
+
+    el.innerHTML = html;
+  }
+
+  function renderDashTopTags() {
+    const tagCount = new Map();
+    for (const [, e] of entries) {
+      for (const t of (e.meta.tags || [])) {
+        tagCount.set(t, (tagCount.get(t) || 0) + 1);
+      }
+    }
+    const top = [...tagCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+    const el = $('#dash-top-tags');
+    if (top.length === 0) {
+      el.innerHTML = '<div class="dash-empty">タグがまだありません</div>';
+      return;
+    }
+    const maxCount = top[0][1];
+    el.innerHTML = top.map(([tag, count]) => {
+      const pct = Math.round((count / maxCount) * 100);
+      return `<div class="dash-tag-row">
+        <span class="dash-tag-name">${escHtml(tag)}</span>
+        <div class="dash-tag-bar-track"><div class="dash-tag-bar-fill" style="width:${pct}%"></div></div>
+        <span class="dash-tag-count">${count}</span>
+      </div>`;
+    }).join('');
+  }
+
+  function renderDashRecent() {
+    const recent = [...entries.entries()]
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .slice(0, 3);
+    const el = $('#dash-recent');
+    if (recent.length === 0) {
+      el.innerHTML = '<div class="empty-state"><div class="emoji">📝</div><p>まだ日記がありません</p></div>';
+      return;
+    }
+    el.innerHTML = recent.map(([ds, e]) => entryCardHtml(ds, e)).join('');
   }
 
   // ---- Calendar ----
@@ -359,6 +487,7 @@
       });
 
       closeEditor();
+      renderDashboard();
       renderCalendar();
       renderList();
       renderTags();
@@ -471,7 +600,7 @@
     });
 
     // Entry card click (list, tags, search)
-    for (const container of [dom.entryList, dom.tagResults, dom.searchResults]) {
+    for (const container of [dom.entryList, dom.tagResults, dom.searchResults, $('#dash-recent')]) {
       container.addEventListener('click', (e) => {
         const card = e.target.closest('.entry-card');
         if (!card) return;
@@ -565,6 +694,7 @@
     });
     $('#btn-clear-cache').addEventListener('click', () => {
       entries.clear();
+      renderDashboard();
       renderCalendar();
       renderList();
       renderTags();

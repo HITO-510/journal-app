@@ -63,15 +63,40 @@
 
     <!-- Navigation Tabs -->
     <nav id="nav-tabs">
-      <button class="tab active" data-view="calendar">カレンダー</button>
+      <button class="tab active" data-view="dashboard">ダッシュボード</button>
+      <button class="tab" data-view="calendar">カレンダー</button>
       <button class="tab" data-view="list">一覧</button>
       <button class="tab" data-view="tags">タグ</button>
     </nav>
 
     <!-- Views -->
     <main id="main-content">
+      <!-- Dashboard View -->
+      <div id="view-dashboard" class="view active">
+        <!-- Stats Cards -->
+        <div class="dash-stats" id="dash-stats"></div>
+
+        <!-- Monthly Heatmap -->
+        <section class="dash-section">
+          <h3 class="dash-section-title">今月の記録</h3>
+          <div id="dash-heatmap" class="dash-heatmap"></div>
+        </section>
+
+        <!-- Top Tags -->
+        <section class="dash-section">
+          <h3 class="dash-section-title">よく使うタグ</h3>
+          <div id="dash-top-tags" class="dash-top-tags"></div>
+        </section>
+
+        <!-- Recent Entries -->
+        <section class="dash-section">
+          <h3 class="dash-section-title">最近の日記</h3>
+          <div id="dash-recent" class="entry-list"></div>
+        </section>
+      </div>
+
       <!-- Calendar View -->
-      <div id="view-calendar" class="view active">
+      <div id="view-calendar" class="view">
         <div class="calendar-header">
           <button id="btn-prev-month" class="icon-btn">◀</button>
           <h2 id="calendar-title"></h2>
