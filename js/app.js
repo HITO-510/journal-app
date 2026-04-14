@@ -37,6 +37,7 @@
     // Editor
     editorModal: $('#editor-modal'),
     editorDateDisplay: $('#editor-date-display'),
+    editorTitle: $('#editor-title'),
     editorTags: $('#editor-tags'),
     editorMood: $('#editor-mood'),
     editorTextarea: $('#editor-textarea'),
@@ -434,10 +435,12 @@
 
     const entry = entries.get(dateStr);
     if (entry) {
+      dom.editorTitle.value = entry.meta.title || '';
       dom.editorTags.value = (entry.meta.tags || []).join(', ');
       dom.editorMood.value = entry.meta.mood || '';
       dom.editorTextarea.value = entry.body;
     } else {
+      dom.editorTitle.value = '';
       dom.editorTags.value = '';
       dom.editorMood.value = '';
       dom.editorTextarea.value = Markdown.defaultTemplate(dateStr);
@@ -466,7 +469,10 @@
       .filter(Boolean);
     const mood = dom.editorMood.value;
 
+    const title = dom.editorTitle.value.trim();
+
     const meta = { date: dateStr };
+    if (title) meta.title = title;
     if (tags.length) meta.tags = tags;
     if (mood) meta.mood = mood;
 
