@@ -1,21 +1,23 @@
 /* ========================================
    HITO Journal - Style
-   Color: Navy (#1a2332) + Orange (#e8833a)
+   Color: Turquoise (#069A8E / IP Tier1) + Honey Gold (#D4A04A)
    ======================================== */
 
 :root {
-  --navy: #1a2332;
-  --navy-light: #243347;
-  --navy-lighter: #2d4059;
-  --orange: #e8833a;
-  --orange-light: #f09a5a;
+  --teal: #1F2A2B;
+  --teal-light: #2A3838;
+  --teal-lighter: #3F5A5C;
+  --turquoise: #069A8E;
+  --turquoise-light: #0BB8A8;
+  --gold: #D4A04A;
+  --gold-light: #E0B563;
   --text: #e8e8e8;
   --text-muted: #8899aa;
   --text-dark: #556677;
-  --bg: #0f1923;
-  --bg-card: #1a2332;
-  --bg-input: #243347;
-  --border: #2d4059;
+  --bg: #162020;
+  --bg-card: #1F2A2B;
+  --bg-input: #2A3838;
+  --border: #3F5A5C;
   --success: #4caf82;
   --danger: #e85555;
   --radius: 12px;
@@ -60,7 +62,7 @@ body {
 
 .setup-container h1 {
   font-size: 28px;
-  color: var(--orange);
+  color: var(--gold);
   margin-bottom: 8px;
 }
 
@@ -94,7 +96,7 @@ form select {
 
 form input:focus,
 form select:focus {
-  border-color: var(--orange);
+  border-color: var(--turquoise);
 }
 
 form small {
@@ -109,7 +111,7 @@ form small {
 .btn-primary {
   display: inline-block;
   padding: 12px 28px;
-  background: var(--orange);
+  background: var(--turquoise);
   color: #fff;
   border: none;
   border-radius: var(--radius-sm);
@@ -120,7 +122,7 @@ form small {
 }
 
 .btn-primary:hover {
-  background: var(--orange-light);
+  background: var(--turquoise-light);
 }
 
 .btn-primary:disabled {
@@ -161,7 +163,7 @@ form small {
 }
 
 .icon-btn:hover {
-  background: var(--navy-light);
+  background: var(--teal-light);
 }
 
 /* ---- Header ---- */
@@ -171,7 +173,7 @@ form small {
   align-items: center;
   padding: 12px 16px;
   padding-top: calc(12px + var(--safe-top));
-  background: var(--navy);
+  background: var(--teal);
   border-bottom: 1px solid var(--border);
 }
 
@@ -184,7 +186,7 @@ form small {
 .app-title {
   font-size: 18px;
   font-weight: 700;
-  color: var(--orange);
+  color: var(--gold);
 }
 
 /* ---- Search Bar ---- */
@@ -192,7 +194,7 @@ form small {
   display: flex;
   align-items: center;
   padding: 8px 16px;
-  background: var(--navy);
+  background: var(--teal);
   border-bottom: 1px solid var(--border);
   gap: 8px;
 }
@@ -209,13 +211,13 @@ form small {
 }
 
 .search-bar input:focus {
-  border-color: var(--orange);
+  border-color: var(--turquoise);
 }
 
 /* ---- Nav Tabs ---- */
 #nav-tabs {
   display: flex;
-  background: var(--navy);
+  background: var(--teal);
   border-bottom: 1px solid var(--border);
   padding: 0 16px;
 }
@@ -234,8 +236,8 @@ form small {
 }
 
 .tab.active {
-  color: var(--orange);
-  border-bottom-color: var(--orange);
+  color: var(--turquoise);
+  border-bottom-color: var(--turquoise);
 }
 
 /* ---- Main Content ---- */
@@ -300,7 +302,7 @@ form small {
 }
 
 .calendar-day:hover {
-  background: var(--navy-light);
+  background: var(--teal-light);
 }
 
 .calendar-day.other-month {
@@ -308,12 +310,12 @@ form small {
 }
 
 .calendar-day.today {
-  background: var(--navy-lighter);
+  background: var(--teal-lighter);
   font-weight: 700;
 }
 
 .calendar-day.has-entry {
-  color: var(--orange);
+  color: var(--turquoise);
   font-weight: 600;
 }
 
@@ -323,12 +325,12 @@ form small {
   bottom: 6px;
   width: 6px;
   height: 6px;
-  background: var(--orange);
+  background: var(--turquoise);
   border-radius: 50%;
 }
 
 .calendar-day.today.has-entry {
-  background: var(--navy-lighter);
+  background: var(--teal-lighter);
 }
 
 /* ---- Dashboard ---- */
@@ -350,7 +352,7 @@ form small {
 .dash-stat-value {
   font-size: 28px;
   font-weight: 700;
-  color: var(--orange);
+  color: var(--gold);
   line-height: 1.2;
 }
 
@@ -392,20 +394,20 @@ form small {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--navy-light);
+  background: var(--teal-light);
   border-radius: 6px;
   font-size: 12px;
   color: var(--text-dark);
 }
 
 .heatmap-cell.filled {
-  background: var(--orange);
+  background: var(--turquoise);
   color: #fff;
   font-weight: 600;
 }
 
 .heatmap-cell.today {
-  outline: 2px solid var(--orange-light);
+  outline: 2px solid var(--turquoise-light);
   outline-offset: -1px;
 }
 
@@ -438,14 +440,14 @@ form small {
 .dash-tag-bar-track {
   flex: 1;
   height: 20px;
-  background: var(--navy-light);
+  background: var(--teal-light);
   border-radius: 10px;
   overflow: hidden;
 }
 
 .dash-tag-bar-fill {
   height: 100%;
-  background: var(--orange);
+  background: var(--turquoise);
   border-radius: 10px;
   transition: width 0.3s ease;
 }
@@ -475,12 +477,12 @@ form small {
 }
 
 .entry-card:hover {
-  border-color: var(--orange);
+  border-color: var(--turquoise);
 }
 
 .entry-card-date {
   font-size: 13px;
-  color: var(--orange);
+  color: var(--gold);
   font-weight: 600;
   margin-bottom: 4px;
 }
@@ -510,7 +512,7 @@ form small {
 .tag-badge {
   display: inline-block;
   padding: 2px 10px;
-  background: var(--navy-lighter);
+  background: var(--teal-lighter);
   border-radius: 12px;
   font-size: 12px;
   color: var(--text-muted);
@@ -526,7 +528,7 @@ form small {
 
 .tag-chip {
   padding: 6px 14px;
-  background: var(--navy-light);
+  background: var(--teal-light);
   border: 1px solid var(--border);
   border-radius: 20px;
   font-size: 14px;
@@ -537,8 +539,8 @@ form small {
 
 .tag-chip:hover,
 .tag-chip.active {
-  background: var(--orange);
-  border-color: var(--orange);
+  background: var(--turquoise);
+  border-color: var(--turquoise);
   color: #fff;
 }
 
@@ -555,19 +557,19 @@ form small {
   right: 24px;
   width: 56px;
   height: 56px;
-  background: var(--orange);
+  background: var(--turquoise);
   border: none;
   border-radius: 50%;
   font-size: 24px;
   cursor: pointer;
-  box-shadow: 0 4px 16px rgba(232, 131, 58, 0.4);
+  box-shadow: 0 4px 16px rgba(6, 154, 142, 0.4);
   transition: transform 0.2s, box-shadow 0.2s;
   z-index: 100;
 }
 
 .fab:hover {
   transform: scale(1.1);
-  box-shadow: 0 6px 24px rgba(232, 131, 58, 0.5);
+  box-shadow: 0 6px 24px rgba(6, 154, 142, 0.5);
 }
 
 /* ---- Modal ---- */
@@ -595,7 +597,7 @@ form small {
   justify-content: space-between;
   padding: 12px 16px;
   padding-top: calc(12px + var(--safe-top));
-  background: var(--navy);
+  background: var(--teal);
   border-bottom: 1px solid var(--border);
 }
 
@@ -612,7 +614,7 @@ form small {
 
 .editor-meta {
   padding: 12px 16px;
-  background: var(--navy);
+  background: var(--teal);
   border-bottom: 1px solid var(--border);
   display: flex;
   gap: 12px;
@@ -641,7 +643,7 @@ form small {
 .editor-tabs {
   display: flex;
   padding: 0 16px;
-  background: var(--navy);
+  background: var(--teal);
   border-bottom: 1px solid var(--border);
 }
 
@@ -657,8 +659,8 @@ form small {
 }
 
 .editor-tab.active {
-  color: var(--orange);
-  border-bottom-color: var(--orange);
+  color: var(--turquoise);
+  border-bottom-color: var(--turquoise);
 }
 
 #editor-textarea {
@@ -702,28 +704,28 @@ form small {
   line-height: 1.8;
 }
 
-.viewer-body h1 { font-size: 22px; margin: 24px 0 12px; color: var(--orange); }
+.viewer-body h1 { font-size: 22px; margin: 24px 0 12px; color: var(--gold); }
 .viewer-body h2 { font-size: 18px; margin: 20px 0 10px; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 6px; }
 .viewer-body h3 { font-size: 16px; margin: 16px 0 8px; }
 .viewer-body p { margin-bottom: 12px; }
 .viewer-body ul, .viewer-body ol { margin-bottom: 12px; padding-left: 24px; }
 .viewer-body li { margin-bottom: 4px; }
 .viewer-body blockquote {
-  border-left: 3px solid var(--orange);
+  border-left: 3px solid var(--gold);
   padding: 8px 16px;
   margin: 12px 0;
   color: var(--text-muted);
-  background: var(--navy-light);
+  background: var(--teal-light);
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }
 .viewer-body code {
-  background: var(--navy-lighter);
+  background: var(--teal-lighter);
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 14px;
 }
 .viewer-body pre {
-  background: var(--navy-light);
+  background: var(--teal-light);
   padding: 16px;
   border-radius: var(--radius-sm);
   overflow-x: auto;
@@ -753,7 +755,7 @@ form small {
 .loading-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 25, 35, 0.85);
+  background: rgba(22, 32, 32, 0.85);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -765,7 +767,7 @@ form small {
   width: 40px;
   height: 40px;
   border: 3px solid var(--border);
-  border-top-color: var(--orange);
+  border-top-color: var(--turquoise);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -786,7 +788,7 @@ form small {
   left: 50%;
   transform: translateX(-50%);
   padding: 12px 24px;
-  background: var(--navy-light);
+  background: var(--teal-light);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   color: var(--text);
