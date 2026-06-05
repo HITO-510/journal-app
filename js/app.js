@@ -630,6 +630,11 @@
     $$('.tab').forEach(tab => {
       tab.addEventListener('click', () => {
         switchView(tab.dataset.view);
+        // カレンダータブは常に今日の月へスナップ（旧📅ボタンの機能を継承）
+        if (tab.dataset.view === 'calendar') {
+          calendarDate = new Date();
+          renderCalendar();
+        }
       });
     });
 
@@ -640,11 +645,6 @@
     });
     $('#btn-next-month').addEventListener('click', () => {
       calendarDate.setMonth(calendarDate.getMonth() + 1);
-      renderCalendar();
-    });
-    $('#btn-today').addEventListener('click', () => {
-      calendarDate = new Date();
-      switchView('calendar');
       renderCalendar();
     });
 
