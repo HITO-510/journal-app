@@ -1,10 +1,11 @@
-const CACHE_NAME = 'hito-journal-v2.4';
+const CACHE_NAME = 'hito-journal-v2.5';
 const ASSETS = [
   './',
   './index.html',
   './css/style.css',
   './js/markdown.js',
   './js/github.js',
+  './js/anthropic.js',
   './js/app.js',
   './manifest.json',
 ];
@@ -31,8 +32,8 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // GitHub API calls: always network
-  if (url.hostname === 'api.github.com') {
+  // API calls (GitHub / Anthropic): always network
+  if (url.hostname === 'api.github.com' || url.hostname === 'api.anthropic.com') {
     event.respondWith(fetch(event.request));
     return;
   }

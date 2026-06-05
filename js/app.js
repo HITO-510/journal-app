@@ -6,6 +6,8 @@
 
   // ---- State ----
   let github = null;
+  let anthropic = null;
+  let rulesCache = null; // RULES.md の内容（整形プロンプト用にキャッシュ）
   let entries = new Map(); // dateStr -> { meta, body, path, sha }
   let currentView = 'dashboard';
   let calendarDate = new Date(); // current month being displayed
@@ -42,6 +44,7 @@
     editorMood: $('#editor-mood'),
     editorTextarea: $('#editor-textarea'),
     editorPreview: $('#editor-preview'),
+    editorFormat: $('#btn-editor-format'),
     // Viewer
     viewerModal: $('#viewer-modal'),
     viewerDateDisplay: $('#viewer-date-display'),
@@ -57,6 +60,7 @@
     const config = loadConfig();
     if (config) {
       github = new GitHubClient(config.token, config.repo, config.path);
+      if (config.anthropicKey) anthropic = new AnthropicClient(config.anthropicKey);
       showApp();
       await loadEntries();
     } else {
@@ -297,7 +301,7 @@
 
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
-    const startOffset = firstDay.getDay();
+    const startOffset = (firstDay.getDay() + 6) % 7;
     const totalDays = lastDay.getDate();
 
     const today = new Date();
@@ -460,6 +464,56 @@
     dom.editorModal.style.display = 'none';
   }
 
+  // ---- AI整形（音声入力 → 日記フォーマット）----
+
+  async function getRules() {
+    if (rulesCache !== null) return rulesCache;
+    try {
+      // RULES.md はリポルート（basePath=entries の外）なので直接パス指定
+      const res = await github.fetchFile('RULES.md');
+      rulesCache = res ? res.content : '';
+    } catch (_) {
+      rulesCache = '';
+    }
+    return rulesCache;
+  }
+
+  async function formatWithAI() {
+    if (!anthropic) {
+      showToast('設定でAnthropic API Keyを入れると整形できます', 'error');
+      openSettings();
+      return;
+    }
+    const raw = dom.editorTextarea.value.trim();
+    if (!raw) {
+      showToast('整形するテキストがありません', 'error');
+      return;
+    }
+
+    dom.editorFormat.disabled = true;
+    showLoading('AIが日記に整形中...');
+    try {
+      const rules = await getRules();
+      const result = await anthropic.formatEntry(raw, editorState.dateStr, rules);
+
+      if (result.body) dom.editorTextarea.value = result.body;
+      if (result.title && !dom.editorTitle.value.trim()) dom.editorTitle.value = result.title;
+      if (result.tags.length && !dom.editorTags.value.trim()) dom.editorTags.value = result.tags.join(', ');
+      if (result.mood && !dom.editorMood.value) dom.editorMood.value = result.mood;
+
+      hideLoading();
+      showToast(
+        result._parseError ? '整形しました（タイトル等は手動で確認を）' : '整形しました',
+        result._parseError ? '' : 'success'
+      );
+    } catch (err) {
+      hideLoading();
+      showToast(`整形エラー: ${err.message}`, 'error');
+    } finally {
+      dom.editorFormat.disabled = false;
+    }
+  }
+
   async function saveEntry() {
     const { dateStr } = editorState;
     const body = dom.editorTextarea.value;
@@ -540,6 +594,7 @@
     $('#settings-token').value = config.token || '';
     $('#settings-repo').value = config.repo || '';
     $('#settings-path').value = config.path || 'entries';
+    $('#settings-anthropic-key').value = config.anthropicKey || '';
     dom.settingsModal.style.display = 'flex';
   }
 
@@ -654,6 +709,7 @@
     // Editor
     $('#btn-editor-back').addEventListener('click', closeEditor);
     $('#btn-editor-save').addEventListener('click', saveEntry);
+    dom.editorFormat.addEventListener('click', formatWithAI);
     $$('.editor-tab').forEach(tab => {
       tab.addEventListener('click', () => {
         $$('.editor-tab').forEach(t => t.classList.remove('active'));
@@ -684,13 +740,16 @@
       const token = $('#settings-token').value.trim();
       const repo = $('#settings-repo').value.trim();
       const path = $('#settings-path').value.trim() || 'entries';
+      const anthropicKey = $('#settings-anthropic-key').value.trim();
 
       showLoading('接続を確認中...');
       try {
         const client = new GitHubClient(token, repo, path);
         await client.testConnection();
-        saveConfig({ token, repo, path });
+        saveConfig({ token, repo, path, anthropicKey });
         github = client;
+        anthropic = anthropicKey ? new AnthropicClient(anthropicKey) : null;
+        rulesCache = null;
         closeSettings();
         await loadEntries();
       } catch (err) {

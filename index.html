@@ -162,6 +162,7 @@
         <div class="editor-tabs">
           <button class="editor-tab active" data-mode="edit">編集</button>
           <button class="editor-tab" data-mode="preview">プレビュー</button>
+          <button id="btn-editor-format" class="btn-format" type="button">✨ AIで整形</button>
         </div>
         <textarea id="editor-textarea" placeholder="今日はどんな一日でしたか？"></textarea>
         <div id="editor-preview" class="editor-preview" style="display:none;"></div>
@@ -202,6 +203,11 @@
           日記フォルダのパス
           <input type="text" id="settings-path">
         </label>
+        <label>
+          Anthropic API Key（任意・AI整形用）
+          <input type="password" id="settings-anthropic-key" placeholder="sk-ant-...">
+          <small>設定すると、音声入力を「✨ AIで整形」できます。キーはこの端末内（localStorage）にのみ保存され、コードには含まれません。</small>
+        </label>
         <button type="submit" class="btn-primary">保存</button>
         <button type="button" id="btn-clear-cache" class="btn-secondary">キャッシュをクリア</button>
       </form>
@@ -219,6 +225,7 @@
 
   <script src="js/markdown.js"></script>
   <script src="js/github.js"></script>
+  <script src="js/anthropic.js"></script>
   <script src="js/app.js"></script>
   <script>
     if ('serviceWorker' in navigator) {

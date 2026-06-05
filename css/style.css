@@ -663,6 +663,29 @@ form small {
   border-bottom-color: var(--turquoise);
 }
 
+.btn-format {
+  margin-left: auto;
+  align-self: center;
+  padding: 6px 14px;
+  background: var(--gold);
+  color: var(--teal);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-format:hover {
+  background: var(--gold-light);
+}
+
+.btn-format:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 #editor-textarea {
   flex: 1;
   width: 100%;
