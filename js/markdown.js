@@ -150,24 +150,38 @@ const Markdown = {
 
   /**
    * Get default template for a new entry.
+   * 2026-06-13: 空セクション見出しは音声入力＋AI整形のフローを妨げるため空文字列に変更。
+   * placeholder（index.html側「今日はどんな一日でしたか？」）でUXは確保。
    */
-  defaultTemplate(dateStr) {
-    const days = ['日', '月', '火', '水', '木', '金', '土'];
-    const d = new Date(dateStr + 'T00:00:00');
-    const dayName = days[d.getDay()];
-    return [
-      `## 今日の出来事`,
-      '',
-      '',
-      '',
-      `## 気づき・学び`,
-      '',
-      '',
-      '',
-      `## 明日に向けて`,
-      '',
-      '',
-    ].join('\n');
+  defaultTemplate(_dateStr) {
+    return '';
+  },
+
+  /**
+   * 音声入力テキストからAI整形の妨げになる空セクション見出しを除去する。
+   * 過去エントリのテンプレ残骸、新規でテンプレが消えなかったケースの両方に効く保険。
+   */
+  stripEmptyTemplateHeadings(text) {
+    if (!text) return '';
+    const TEMPLATE_H2 = /^##\s*(今日の出来事|気づき・学び|明日に向けて|朝|午前|午後|夜|午前 \/ 午後)\s*$/;
+    const lines = text.split('\n');
+    const kept = [];
+    for (let i = 0; i < lines.length; i++) {
+      if (TEMPLATE_H2.test(lines[i].trim())) {
+        // この見出しに「本文らしい中身」が続いているか？
+        let hasContent = false;
+        for (let j = i + 1; j < lines.length; j++) {
+          const t = lines[j].trim();
+          if (!t) continue;
+          if (t.startsWith('## ')) break; // 次の見出しまでに中身がない
+          hasContent = true;
+          break;
+        }
+        if (!hasContent) continue; // 空セクションはスキップ
+      }
+      kept.push(lines[i]);
+    }
+    return kept.join('\n').replace(/\n{3,}/g, '\n\n').trim();
   },
 
   /**

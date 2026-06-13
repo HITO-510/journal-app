@@ -502,7 +502,9 @@
       openSettings();
       return;
     }
-    const raw = dom.editorTextarea.value.trim();
+    // テンプレ空見出しは整形の妨げになるので送信前に除去（防御的・プロンプト指示の保険）
+    const rawWithTemplate = dom.editorTextarea.value;
+    const raw = Markdown.stripEmptyTemplateHeadings(rawWithTemplate);
     if (!raw) {
       showToast('整形するテキストがありません', 'error');
       return;
