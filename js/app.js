@@ -60,7 +60,7 @@
     const config = loadConfig();
     if (config) {
       github = new GitHubClient(config.token, config.repo, config.path);
-      if (config.anthropicKey) anthropic = new AnthropicClient(config.anthropicKey);
+      if (config.anthropicKey) anthropic = new AnthropicClient(config.anthropicKey, config.model);
       showApp();
       await loadEntries();
     } else {
@@ -475,7 +475,25 @@
     } catch (_) {
       rulesCache = '';
     }
+    if (!rulesCache) {
+      // 辞書なし整形は質が落ちるので、無言で進めず必ず知らせる
+      showToast('RULES.md（整形ルール・辞書）を取得できませんでした。辞書なしで整形します', 'error');
+    }
     return rulesCache;
+  }
+
+  /** 過去エントリの既存タグを使用頻度順で返す（タグの表記揺れ防止用） */
+  function collectTagVocabulary(limit = 30) {
+    const tagCount = new Map();
+    for (const [, e] of entries) {
+      for (const t of (e.meta.tags || [])) {
+        tagCount.set(t, (tagCount.get(t) || 0) + 1);
+      }
+    }
+    return [...tagCount.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit)
+      .map(([tag]) => tag);
   }
 
   async function formatWithAI() {
@@ -494,19 +512,18 @@
     showLoading('AIが日記に整形中...');
     try {
       const rules = await getRules();
-      const result = await anthropic.formatEntry(raw, editorState.dateStr, rules);
+      const result = await anthropic.formatEntry(raw, editorState.dateStr, rules, collectTagVocabulary());
 
+      // 本文が空で返ったら原文（音声入力）を消さない
       if (result.body) dom.editorTextarea.value = result.body;
       if (result.title && !dom.editorTitle.value.trim()) dom.editorTitle.value = result.title;
       if (result.tags.length && !dom.editorTags.value.trim()) dom.editorTags.value = result.tags.join(', ');
       if (result.mood && !dom.editorMood.value) dom.editorMood.value = result.mood;
 
       hideLoading();
-      showToast(
-        result._parseError ? '整形しました（タイトル等は手動で確認を）' : '整形しました',
-        result._parseError ? '' : 'success'
-      );
+      showToast('整形しました', 'success');
     } catch (err) {
+      // 失敗時は textarea に触らない＝口述した原文はそのまま残る
       hideLoading();
       showToast(`整形エラー: ${err.message}`, 'error');
     } finally {
@@ -595,6 +612,7 @@
     $('#settings-repo').value = config.repo || '';
     $('#settings-path').value = config.path || 'entries';
     $('#settings-anthropic-key').value = config.anthropicKey || '';
+    $('#settings-model').value = config.model || 'claude-sonnet-4-6';
     dom.settingsModal.style.display = 'flex';
   }
 
@@ -741,14 +759,15 @@
       const repo = $('#settings-repo').value.trim();
       const path = $('#settings-path').value.trim() || 'entries';
       const anthropicKey = $('#settings-anthropic-key').value.trim();
+      const model = $('#settings-model').value;
 
       showLoading('接続を確認中...');
       try {
         const client = new GitHubClient(token, repo, path);
         await client.testConnection();
-        saveConfig({ token, repo, path, anthropicKey });
+        saveConfig({ token, repo, path, anthropicKey, model });
         github = client;
-        anthropic = anthropicKey ? new AnthropicClient(anthropicKey) : null;
+        anthropic = anthropicKey ? new AnthropicClient(anthropicKey, model) : null;
         rulesCache = null;
         closeSettings();
         await loadEntries();

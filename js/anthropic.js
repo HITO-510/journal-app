@@ -6,11 +6,14 @@
  * - APIキーはこのコードに書かない。app.js が localStorage から渡す。
  * - 固有名詞辞書（家族の実名など）もここに書かない。Private な RULES.md を
  *   app.js が取得して渡してくるので、それをシステムプロンプトに動的注入する。
+ *
+ * 整形結果の受け取りはツール呼び出し（構造化出力）方式。
+ * モデルにJSON文字列を書かせる方式と違い、API層でスキーマ検証されるため
+ * 改行エスケープ崩れなどでパースに失敗することがない。
  */
 class AnthropicClient {
   constructor(apiKey, model) {
     this.apiKey = apiKey;
-    // 質を上げたいときは 'claude-opus-4-8' に変更（コスト増・速度低下）
     this.model = model || 'claude-sonnet-4-6';
     this.endpoint = 'https://api.anthropic.com/v1/messages';
   }
@@ -25,34 +28,60 @@ class AnthropicClient {
     };
   }
 
+  get entryTool() {
+    return {
+      name: 'save_entry',
+      description: '整形した日記エントリを保存する',
+      input_schema: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: 'その日を一言で表すタイトル（10〜20字程度）' },
+          tags: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'タグを3〜6個。既存タグ一覧の語彙を優先し、同義の新タグを作らない',
+          },
+          mood: { type: 'string', enum: ['great', 'good', 'neutral', 'bad', 'terrible'] },
+          body: { type: 'string', description: '## 見出し付きのMarkdown本文。frontmatterは含めない' },
+        },
+        required: ['title', 'tags', 'mood', 'body'],
+      },
+    };
+  }
+
   /**
    * 生テキストを {title, tags, mood, body} に整形して返す。
    * @param {string} rawText  音声入力の生テキスト
    * @param {string} dateStr  YYYY-MM-DD
    * @param {string} rulesText  RULES.md の中身（整形ルール・固有名詞辞書）
+   * @param {string[]} existingTags  過去エントリの既存タグ（使用頻度順）
    */
-  async formatEntry(rawText, dateStr, rulesText) {
+  async formatEntry(rawText, dateStr, rulesText, existingTags) {
     const system = this.buildSystemPrompt(rulesText);
+    const tagHint = (existingTags && existingTags.length)
+      ? `既存タグ一覧（使用頻度順・この語彙を優先する）: ${existingTags.join(', ')}\n\n`
+      : '';
 
     const res = await fetch(this.endpoint, {
       method: 'POST',
       headers: this.headers,
       body: JSON.stringify({
         model: this.model,
-        max_tokens: 4096,
+        max_tokens: 8192,
         system: [
           { type: 'text', text: system, cache_control: { type: 'ephemeral' } },
         ],
+        tools: [this.entryTool],
+        tool_choice: { type: 'tool', name: 'save_entry' },
         messages: [
           {
             role: 'user',
             content:
-              `日付: ${dateStr}\n\n` +
+              `日付: ${dateStr}\n` +
+              tagHint +
               `次の音声入力（口述）を、日記として整形してください。\n` +
               `--- 音声入力ここから ---\n${rawText}\n--- ここまで ---`,
           },
-          // prefill: JSONの開始を固定して出力を安定させる
-          { role: 'assistant', content: '{' },
         ],
       }),
     });
@@ -62,12 +91,19 @@ class AnthropicClient {
       try { const e = await res.json(); detail = e.error?.message || ''; } catch (_) {}
       if (res.status === 401) throw new Error('APIキーが無効です');
       if (res.status === 429) throw new Error('混み合っています。少し待って再試行してください');
+      if (res.status === 400 && /credit/i.test(detail)) throw new Error('APIの残高が不足しています。チャージしてください');
       throw new Error(`${res.status} ${detail}`.trim());
     }
 
     const data = await res.json();
-    const text = '{' + (data.content && data.content[0] ? data.content[0].text : '');
-    return this.parseResult(text);
+    if (data.stop_reason === 'max_tokens') {
+      throw new Error('日記が長く、整形結果が途中で切れました。本文を2回に分けて整形してください');
+    }
+    const block = (data.content || []).find(b => b.type === 'tool_use' && b.name === 'save_entry');
+    if (!block || !block.input) {
+      throw new Error('整形結果を受け取れませんでした。もう一度試してください');
+    }
+    return this.normalizeResult(block.input);
   }
 
   buildSystemPrompt(rulesText) {
@@ -76,7 +112,7 @@ class AnthropicClient {
       'iPhoneの音声入力で口述された生テキストを、本人の言葉を保ったまま読みやすい日記に整えます。',
       '',
       '## 整形ルール',
-      '- 音声入力の誤変換は文脈から判断して修正する',
+      '- 音声入力の誤変換は、まずRULES.mdの辞書と突き合わせて修正する（自分の推測より辞書を優先）',
       '- 同じ意味の繰り返し・言い直しはデデュープする（「頑張る頑張ろう」→「頑張ろう」）',
       '- フィラー（えーと/あの/言い直しの断片）は除去する',
       '- 過度な要約や省略はしない。本人の言葉・ニュアンスをなるべく残す',
@@ -84,39 +120,23 @@ class AnthropicClient {
       '- 見出しは ## （H2）で、その日の流れに沿って3〜6個程度に分ける',
       '- 文体は常体（〜だ／〜した／〜と思う）。本人の口調に合わせる',
       '- 改行は多めに。段落を分けて読みやすくする',
+      '- タグは既存タグ一覧の語彙を優先する。同義の新タグ（表記揺れ）を作らない',
       '',
       '## 日記リポジトリのルール（RULES.md・最優先で従う）',
       '※ 固有名詞・音声誤変換の辞書はここに含まれる。最優先で適用すること。',
       rulesText || '(取得できませんでした。上記の一般ルールで整形してください)',
       '',
-      '## 出力形式',
-      '必ず次のJSONオブジェクト**のみ**を出力する（前後に説明文やコードフェンスを付けない）。',
-      '{',
-      '  "title": "その日を一言で表すタイトル（10〜20字程度）",',
-      '  "tags": ["タグを3〜6個。人名・出来事・活動など"],',
-      '  "mood": "great|good|neutral|bad|terrible のいずれか1つ",',
-      '  "body": "## 見出し\\n\\n本文…（Markdown本文のみ。frontmatterは含めない）"',
-      '}',
+      '整形が終わったら、必ず save_entry ツールで結果を返すこと。',
     ].join('\n');
   }
 
-  parseResult(jsonText) {
-    let t = (jsonText || '').trim();
-    // 念のためコードフェンスを除去
-    const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (fence) t = fence[1].trim();
-    try {
-      const obj = JSON.parse(t);
-      const moods = ['great', 'good', 'neutral', 'bad', 'terrible'];
-      return {
-        title: typeof obj.title === 'string' ? obj.title.trim() : '',
-        tags: Array.isArray(obj.tags) ? obj.tags.filter(x => typeof x === 'string' && x.trim()).map(x => x.trim()) : [],
-        mood: moods.includes(obj.mood) ? obj.mood : '',
-        body: typeof obj.body === 'string' ? obj.body.trim() : '',
-      };
-    } catch (_) {
-      // JSONとして読めなければ全文をbodyに入れて手当て
-      return { title: '', tags: [], mood: '', body: (jsonText || '').trim(), _parseError: true };
-    }
+  normalizeResult(input) {
+    const moods = ['great', 'good', 'neutral', 'bad', 'terrible'];
+    return {
+      title: typeof input.title === 'string' ? input.title.trim() : '',
+      tags: Array.isArray(input.tags) ? input.tags.filter(x => typeof x === 'string' && x.trim()).map(x => x.trim()) : [],
+      mood: moods.includes(input.mood) ? input.mood : '',
+      body: typeof input.body === 'string' ? input.body.trim() : '',
+    };
   }
 }
