@@ -881,3 +881,59 @@ form small {
     width: 100%;
   }
 }
+
+/* ---- v2.9: 音声入力UX改善 ---- */
+.format-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 0;
+}
+.mini-row {
+  display: flex;
+  gap: 6px;
+  padding: 4px 0;
+}
+.mini-row input {
+  flex: 1;
+  min-width: 0;
+}
+.title-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.title-chips .title-chip {
+  font-size: 12px;
+  cursor: pointer;
+}
+.draft-banner {
+  background: rgba(212, 160, 74, 0.15);
+  border: 1px solid rgba(212, 160, 74, 0.5);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 12px 0;
+}
+.draft-banner .spacer {
+  flex: 1;
+}
+/* v2.9 fix: チップは editor-meta の外・独立行として表示 */
+.title-chips {
+  padding: 0 12px 8px;
+}
+.title-chips .title-chip {
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.draft-banner button {
+  white-space: nowrap;
+}
+.draft-banner span:first-child {
+  white-space: nowrap;
+}

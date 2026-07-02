@@ -35,7 +35,12 @@ class AnthropicClient {
       input_schema: {
         type: 'object',
         properties: {
-          title: { type: 'string', description: 'その日を一言で表すタイトル（10〜20字程度）' },
+          title: { type: 'string', description: 'その日を一言で表すタイトル（10〜20字程度・一番のおすすめ）' },
+          title_alts: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'タイトルの別候補を1〜2個（titleとは違う切り口で）',
+          },
           tags: {
             type: 'array',
             items: { type: 'string' },
@@ -55,11 +60,15 @@ class AnthropicClient {
    * @param {string} dateStr  YYYY-MM-DD
    * @param {string} rulesText  RULES.md の中身（整形ルール・固有名詞辞書）
    * @param {string[]} existingTags  過去エントリの既存タグ（使用頻度順）
+   * @param {string} [extraInstruction]  再整形時の追加指示（例:「もっと短く」）
    */
-  async formatEntry(rawText, dateStr, rulesText, existingTags) {
+  async formatEntry(rawText, dateStr, rulesText, existingTags, extraInstruction) {
     const system = this.buildSystemPrompt(rulesText);
     const tagHint = (existingTags && existingTags.length)
       ? `既存タグ一覧（使用頻度順・この語彙を優先する）: ${existingTags.join(', ')}\n\n`
+      : '';
+    const extraHint = (extraInstruction && extraInstruction.trim())
+      ? `\n\n追加指示（最優先で反映すること）: ${extraInstruction.trim()}`
       : '';
 
     const res = await fetch(this.endpoint, {
@@ -80,7 +89,8 @@ class AnthropicClient {
               `日付: ${dateStr}\n` +
               tagHint +
               `次の音声入力（口述）を、日記として整形してください。\n` +
-              `--- 音声入力ここから ---\n${rawText}\n--- ここまで ---`,
+              `--- 音声入力ここから ---\n${rawText}\n--- ここまで ---` +
+              extraHint,
           },
         ],
       }),
@@ -112,6 +122,7 @@ class AnthropicClient {
       'iPhoneの音声入力で口述された生テキストを、本人の言葉を保ったまま読みやすい日記に整えます。',
       '',
       '## 整形ルール',
+      '- 入力はOS純正の音声入力。同音異義語の誤変換・句読点の欠落・言い直しの連結が多い前提で読むこと',
       '- 音声入力の誤変換は、まずRULES.mdの辞書と突き合わせて修正する（自分の推測より辞書を優先）',
       '- 同じ意味の繰り返し・言い直しはデデュープする（「頑張る頑張ろう」→「頑張ろう」）',
       '- フィラー（えーと/あの/言い直しの断片）は除去する',
@@ -134,8 +145,13 @@ class AnthropicClient {
 
   normalizeResult(input) {
     const moods = ['great', 'good', 'neutral', 'bad', 'terrible'];
+    const title = typeof input.title === 'string' ? input.title.trim() : '';
+    const alts = Array.isArray(input.title_alts)
+      ? input.title_alts.filter(x => typeof x === 'string' && x.trim() && x.trim() !== title).map(x => x.trim()).slice(0, 2)
+      : [];
     return {
-      title: typeof input.title === 'string' ? input.title.trim() : '',
+      title,
+      title_alts: alts,
       tags: Array.isArray(input.tags) ? input.tags.filter(x => typeof x === 'string' && x.trim()).map(x => x.trim()) : [],
       mood: moods.includes(input.mood) ? input.mood : '',
       body: typeof input.body === 'string' ? input.body.trim() : '',

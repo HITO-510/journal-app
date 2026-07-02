@@ -136,6 +136,12 @@
         <span id="editor-date-display"></span>
         <button id="btn-editor-save" class="btn-primary btn-sm">保存</button>
       </div>
+      <div id="draft-banner" class="draft-banner" style="display:none;">
+        <span>📝 未保存の下書きがあります</span>
+        <span class="spacer"></span>
+        <button id="btn-draft-restore" class="btn-primary btn-sm" type="button">復元</button>
+        <button id="btn-draft-discard" class="btn-secondary btn-sm" type="button">破棄</button>
+      </div>
       <div class="editor-meta">
         <label>
           タイトル
@@ -157,11 +163,26 @@
           </select>
         </label>
       </div>
+      <div id="title-chips" class="title-chips" style="display:none;"></div>
       <div class="editor-body">
         <div class="editor-tabs">
           <button class="editor-tab active" data-mode="edit">編集</button>
           <button class="editor-tab" data-mode="preview">プレビュー</button>
           <button id="btn-editor-format" class="btn-format" type="button">✨ AIで整形</button>
+        </div>
+        <div id="format-bar" class="format-bar" style="display:none;">
+          <button id="btn-toggle-original" class="btn-secondary btn-sm" type="button">原文を表示</button>
+          <button id="btn-retry-format" class="btn-secondary btn-sm" type="button">↻ 再整形</button>
+          <button id="btn-dict-add" class="btn-secondary btn-sm" type="button">＋辞書</button>
+        </div>
+        <div id="retry-row" class="mini-row" style="display:none;">
+          <input type="text" id="retry-instruction" placeholder="指示（任意）例: もっと短く / 見出しを減らして">
+          <button id="btn-retry-run" class="btn-primary btn-sm" type="button">実行</button>
+        </div>
+        <div id="dict-row" class="mini-row" style="display:none;">
+          <input type="text" id="dict-wrong" placeholder="誤（例: 給食）">
+          <input type="text" id="dict-right" placeholder="正（例: 休職）">
+          <button id="btn-dict-save" class="btn-primary btn-sm" type="button">追加</button>
         </div>
         <textarea id="editor-textarea" placeholder="今日はどんな一日でしたか？"></textarea>
         <div id="editor-preview" class="editor-preview" style="display:none;"></div>

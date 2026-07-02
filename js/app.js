@@ -45,6 +45,14 @@
     editorTextarea: $('#editor-textarea'),
     editorPreview: $('#editor-preview'),
     editorFormat: $('#btn-editor-format'),
+    editorTitleChips: $('#title-chips'),
+    draftBanner: $('#draft-banner'),
+    formatBar: $('#format-bar'),
+    retryRow: $('#retry-row'),
+    retryInstruction: $('#retry-instruction'),
+    dictRow: $('#dict-row'),
+    dictWrong: $('#dict-wrong'),
+    dictRight: $('#dict-right'),
     // Viewer
     viewerModal: $('#viewer-modal'),
     viewerDateDisplay: $('#viewer-date-display'),
@@ -433,6 +441,71 @@
 
   let editorState = { dateStr: '', isNew: false };
 
+  // ---- 音声入力UX（v2.9）: 原文保護・下書き自動保存・タイトル候補 ----
+
+  let formatState = { rawBackup: null, formattedText: null, showingOriginal: false, lastResult: null };
+
+  function resetFormatUx() {
+    formatState = { rawBackup: null, formattedText: null, showingOriginal: false, lastResult: null };
+    dom.formatBar.style.display = 'none';
+    dom.retryRow.style.display = 'none';
+    dom.dictRow.style.display = 'none';
+    dom.editorTitleChips.style.display = 'none';
+    dom.editorTitleChips.innerHTML = '';
+    $('#btn-toggle-original').textContent = '原文を表示';
+  }
+
+  const DRAFT_PREFIX = 'hito-journal-draft-';
+  let draftTimer = null;
+
+  function saveDraft() {
+    if (!editorState.dateStr) return;
+    const data = {
+      text: dom.editorTextarea.value,
+      title: dom.editorTitle.value,
+      tags: dom.editorTags.value,
+      mood: dom.editorMood.value,
+      ts: Date.now(),
+    };
+    try { localStorage.setItem(DRAFT_PREFIX + editorState.dateStr, JSON.stringify(data)); } catch (_) {}
+  }
+
+  function scheduleDraftSave() {
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(saveDraft, 1500);
+  }
+
+  function loadDraft(dateStr) {
+    try {
+      const raw = localStorage.getItem(DRAFT_PREFIX + dateStr);
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) { return null; }
+  }
+
+  function clearDraft(dateStr) {
+    try { localStorage.removeItem(DRAFT_PREFIX + dateStr); } catch (_) {}
+  }
+
+  function applyDraft(draft) {
+    dom.editorTextarea.value = draft.text || '';
+    if (draft.title) dom.editorTitle.value = draft.title;
+    if (draft.tags) dom.editorTags.value = draft.tags;
+    if (draft.mood) dom.editorMood.value = draft.mood;
+  }
+
+  function renderTitleChips(result) {
+    const candidates = [result.title, ...(result.title_alts || [])].filter(Boolean);
+    if (candidates.length < 2) {
+      dom.editorTitleChips.style.display = 'none';
+      dom.editorTitleChips.innerHTML = '';
+      return;
+    }
+    dom.editorTitleChips.innerHTML = candidates.map(t =>
+      `<button type="button" class="tag-chip title-chip" data-title="${escHtml(t)}">${escHtml(t)}</button>`
+    ).join('');
+    dom.editorTitleChips.style.display = 'flex';
+  }
+
   function openEditor(dateStr, isNew = false) {
     editorState = { dateStr, isNew };
     dom.editorDateDisplay.textContent = Markdown.formatDate(dateStr);
@@ -456,11 +529,23 @@
     dom.editorTextarea.style.display = 'block';
     dom.editorPreview.style.display = 'none';
 
+    resetFormatUx();
+
+    // 未保存の下書きがあれば復元を提案（音声入力の消失防止）
+    const draft = loadDraft(dateStr);
+    if (draft && draft.text && draft.text.trim() && draft.text !== dom.editorTextarea.value) {
+      dom.draftBanner.style.display = 'flex';
+    } else {
+      dom.draftBanner.style.display = 'none';
+    }
+
     dom.editorModal.style.display = 'flex';
     dom.editorTextarea.focus();
   }
 
-  function closeEditor() {
+  function closeEditor(skipDraftSave) {
+    // 保存せずに閉じても書きかけが消えないよう、閉じる瞬間に下書き保存
+    if (!skipDraftSave) saveDraft();
     dom.editorModal.style.display = 'none';
   }
 
@@ -512,17 +597,28 @@
 
     dom.editorFormat.disabled = true;
     showLoading('AIが日記に整形中...');
+    const originalText = dom.editorTextarea.value; // 原文を保護（切替・再整形用）
     try {
       const rules = await getRules();
       const result = await anthropic.formatEntry(raw, editorState.dateStr, rules, collectTagVocabulary());
 
       // 本文が空で返ったら原文（音声入力）を消さない
-      if (result.body) dom.editorTextarea.value = result.body;
+      if (result.body) {
+        formatState.rawBackup = originalText;
+        formatState.formattedText = result.body;
+        formatState.showingOriginal = false;
+        formatState.lastResult = result;
+        dom.editorTextarea.value = result.body;
+        dom.formatBar.style.display = 'flex';
+        $('#btn-toggle-original').textContent = '原文を表示';
+        renderTitleChips(result);
+      }
       if (result.title && !dom.editorTitle.value.trim()) dom.editorTitle.value = result.title;
       if (result.tags.length && !dom.editorTags.value.trim()) dom.editorTags.value = result.tags.join(', ');
       if (result.mood && !dom.editorMood.value) dom.editorMood.value = result.mood;
 
       hideLoading();
+      scheduleDraftSave();
       showToast('整形しました', 'success');
     } catch (err) {
       // 失敗時は textarea に触らない＝口述した原文はそのまま残る
@@ -530,6 +626,95 @@
       showToast(`整形エラー: ${err.message}`, 'error');
     } finally {
       dom.editorFormat.disabled = false;
+    }
+  }
+
+  /** 原文⇔整形結果の切り替え（それぞれの編集内容は保持する） */
+  function toggleOriginal() {
+    if (formatState.rawBackup === null) return;
+    const btn = $('#btn-toggle-original');
+    if (formatState.showingOriginal) {
+      formatState.rawBackup = dom.editorTextarea.value;
+      dom.editorTextarea.value = formatState.formattedText || '';
+      formatState.showingOriginal = false;
+      btn.textContent = '原文を表示';
+    } else {
+      formatState.formattedText = dom.editorTextarea.value;
+      dom.editorTextarea.value = formatState.rawBackup || '';
+      formatState.showingOriginal = true;
+      btn.textContent = '整形結果に戻す';
+    }
+  }
+
+  /** 原文をベースに、追加指示つきでもう一度整形する */
+  async function retryFormat() {
+    if (!anthropic) {
+      showToast('設定でAnthropic API Keyを入れると整形できます', 'error');
+      return;
+    }
+    const source = formatState.rawBackup !== null ? formatState.rawBackup : dom.editorTextarea.value;
+    const raw = Markdown.stripEmptyTemplateHeadings(source);
+    if (!raw) {
+      showToast('整形するテキストがありません', 'error');
+      return;
+    }
+    const instruction = dom.retryInstruction.value.trim();
+
+    dom.editorFormat.disabled = true;
+    showLoading('AIが整形し直しています...');
+    try {
+      const rules = await getRules();
+      const result = await anthropic.formatEntry(raw, editorState.dateStr, rules, collectTagVocabulary(), instruction);
+      if (result.body) {
+        formatState.formattedText = result.body;
+        formatState.showingOriginal = false;
+        formatState.lastResult = result;
+        dom.editorTextarea.value = result.body;
+        $('#btn-toggle-original').textContent = '原文を表示';
+        renderTitleChips(result);
+      }
+      if (result.mood && !dom.editorMood.value) dom.editorMood.value = result.mood;
+      hideLoading();
+      dom.retryRow.style.display = 'none';
+      scheduleDraftSave();
+      showToast('整形し直しました', 'success');
+    } catch (err) {
+      hideLoading();
+      showToast(`整形エラー: ${err.message}`, 'error');
+    } finally {
+      dom.editorFormat.disabled = false;
+    }
+  }
+
+  /** 誤変換ペアを Private リポの RULES.md 末尾（アプリ追加分セクション）へ追記する */
+  async function addDictEntry() {
+    const wrong = dom.dictWrong.value.trim();
+    const right = dom.dictRight.value.trim();
+    if (!wrong || !right) {
+      showToast('「誤」と「正」を両方入れてください', 'error');
+      return;
+    }
+
+    showLoading('辞書に追加中...');
+    try {
+      const res = await github.fetchFile('RULES.md'); // 最新sha取得
+      if (!res) throw new Error('RULES.md を取得できません');
+      const marker = '## アプリからの辞書追加分';
+      let content = res.content.trimEnd();
+      if (!content.includes(marker)) {
+        content += `\n\n${marker}\n\n（アプリの「＋辞書」から追記。定期的に本体辞書へ統合する）`;
+      }
+      content += `\n- ${wrong} → ${right}\n`;
+      await github.saveFile('RULES.md', content, `RULES: アプリから辞書追加（${wrong}→${right}）`);
+      rulesCache = null; // 次回整形から反映
+      dom.dictWrong.value = '';
+      dom.dictRight.value = '';
+      dom.dictRow.style.display = 'none';
+      hideLoading();
+      showToast(`辞書に追加しました: ${wrong} → ${right}`, 'success');
+    } catch (err) {
+      hideLoading();
+      showToast(`辞書追加エラー: ${err.message}`, 'error');
     }
   }
 
@@ -565,7 +750,8 @@
         raw: content,
       });
 
-      closeEditor();
+      clearDraft(dateStr);
+      closeEditor(true);
       renderDashboard();
       renderCalendar();
       renderList();
@@ -727,9 +913,45 @@
     });
 
     // Editor
-    $('#btn-editor-back').addEventListener('click', closeEditor);
+    $('#btn-editor-back').addEventListener('click', () => closeEditor());
     $('#btn-editor-save').addEventListener('click', saveEntry);
     dom.editorFormat.addEventListener('click', formatWithAI);
+
+    // 音声入力UX（v2.9）
+    $('#btn-toggle-original').addEventListener('click', toggleOriginal);
+    $('#btn-retry-format').addEventListener('click', () => {
+      const visible = dom.retryRow.style.display !== 'none';
+      dom.retryRow.style.display = visible ? 'none' : 'flex';
+      if (!visible) dom.retryInstruction.focus();
+    });
+    $('#btn-retry-run').addEventListener('click', retryFormat);
+    $('#btn-dict-add').addEventListener('click', () => {
+      const visible = dom.dictRow.style.display !== 'none';
+      dom.dictRow.style.display = visible ? 'none' : 'flex';
+      if (!visible) dom.dictWrong.focus();
+    });
+    $('#btn-dict-save').addEventListener('click', addDictEntry);
+    dom.editorTitleChips.addEventListener('click', (e) => {
+      const chip = e.target.closest('.title-chip');
+      if (!chip) return;
+      dom.editorTitle.value = chip.dataset.title;
+      scheduleDraftSave();
+    });
+    $('#btn-draft-restore').addEventListener('click', () => {
+      const draft = loadDraft(editorState.dateStr);
+      if (draft) applyDraft(draft);
+      dom.draftBanner.style.display = 'none';
+      showToast('下書きを復元しました', 'success');
+    });
+    $('#btn-draft-discard').addEventListener('click', () => {
+      clearDraft(editorState.dateStr);
+      dom.draftBanner.style.display = 'none';
+    });
+    // 下書き自動保存（1.5秒デバウンス・音声入力の消失防止）
+    dom.editorTextarea.addEventListener('input', scheduleDraftSave);
+    dom.editorTitle.addEventListener('input', scheduleDraftSave);
+    dom.editorTags.addEventListener('input', scheduleDraftSave);
+    dom.editorMood.addEventListener('change', scheduleDraftSave);
     $$('.editor-tab').forEach(tab => {
       tab.addEventListener('click', () => {
         $$('.editor-tab').forEach(t => t.classList.remove('active'));
