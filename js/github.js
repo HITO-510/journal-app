@@ -2,6 +2,12 @@
  * GitHub API Client for HITO Journal
  * Handles all communication with the GitHub Contents API.
  */
+
+// ルート取得が404になった時の案内。GitHubはPrivateリポへの権限が無いと
+// 403ではなく404を返すので、「日記0件」と区別がつかなくなる
+const TOKEN_HINT_404 =
+  '日記フォルダを取得できませんでした（404）。GitHubトークンが失効したか、リポジトリへの権限が外れている可能性があります。⚙設定でトークンを入れ直してください。';
+
 class GitHubClient {
   constructor(token, repo, basePath) {
     this.token = token;
@@ -39,6 +45,10 @@ class GitHubClient {
    * Returns an array of file paths relative to basePath.
    */
   async fetchTree(subPath = '') {
+    // ルート（entries直下）かどうか。ルートの404は「日記が0件」ではなく
+    // トークン失効・権限切れの疑いが濃い＝Privateリポは403でなく404を返すため、
+    // 黙って[]を返さずエラーにする（2026-08-25: 空表示の原因が特定できなかった実害）
+    const isRoot = !subPath;
     const fullPath = subPath
       ? `${this.basePath}/${subPath}`
       : this.basePath;
@@ -48,7 +58,10 @@ class GitHubClient {
         `${this.apiBase}/repos/${this.repo}/contents/${encodeURIComponent(fullPath)}`,
         { headers: this.headers }
       );
-      if (res.status === 404) return [];
+      if (res.status === 404) {
+        if (isRoot) throw new Error(TOKEN_HINT_404);
+        return [];
+      }
       if (!res.ok) throw new Error(`ツリー取得エラー: ${res.status}`);
 
       const items = await res.json();
@@ -70,7 +83,8 @@ class GitHubClient {
       }
       return files;
     } catch (err) {
-      if (err.message.includes('404')) return [];
+      // 途中の階層（空フォルダ等）だけ従来どおり握りつぶす。ルートは必ず投げる
+      if (!isRoot && err.message.includes('404')) return [];
       throw err;
     }
   }
