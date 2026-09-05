@@ -507,7 +507,10 @@
   }
 
   function openEditor(dateStr, isNew = false) {
-    editorState = { dateStr, isNew };
+    // ⚠開いた時点の本文を控える（2026-09-05）。保存時にこれと比べて、
+    // 本文が変わっていれば confirmed を持ち越さず確認待ちへ戻す
+    const opened = entries.get(dateStr);
+    editorState = { dateStr, isNew, originalBody: opened ? opened.body : '' };
     dom.editorDateDisplay.textContent = Markdown.formatDate(dateStr);
 
     const entry = entries.get(dateStr);
@@ -729,10 +732,27 @@
 
     const title = dom.editorTitle.value.trim();
 
+    // ⚠既存の来歴（記録日時・入力ID・確認状態など）を保存経路で落とさない（2026-09-05）。
+    // 旧版は meta を date/title/tags/mood の4キーで作り直していたため、markdown.js の
+    // serialize を直しても**ここで消えていた**（Codex再監査⑥・実関数テストで確認）。
+    const KNOWN = ['date', 'title', 'tags', 'mood'];
+    const existing = (entries.get(dateStr) || {}).meta || {};
+
     const meta = { date: dateStr };
     if (title) meta.title = title;
     if (tags.length) meta.tags = tags;
     if (mood) meta.mood = mood;
+    for (const [k, v] of Object.entries(existing)) {
+      if (KNOWN.includes(k)) continue;
+      meta[k] = v;                       // 既知4キー以外は元の順で持ち越す
+    }
+
+    // ⚠本文を変えたら confirmed を無条件で持ち越さない＝編集後は確認待ちへ戻す
+    const originalBody = editorState.originalBody;
+    if (originalBody !== undefined && originalBody !== body && 'confirmed' in meta) {
+      meta.confirmed = 'false';
+      meta.confirm_invalidated_at = new Date().toISOString();
+    }
 
     const content = Markdown.serialize(meta, body);
     const filePath = github.buildEntryPath(dateStr);
