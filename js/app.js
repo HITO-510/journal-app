@@ -721,6 +721,18 @@
     }
   }
 
+  /**
+   * 確定した「版」を表す短いハッシュ。⚠これはアプリ側の印であって、
+   * scripts/journal-confirm.py が出すトークンとは別物（あちらはファイル全文のハッシュ）。
+   * 目的は「保存された内容が、確認時に画面へ出ていた内容と同じか」を後から見分けられるようにすること。
+   */
+  async function versionHash(dateStr, title, tags, mood, body) {
+    const src = [dateStr, title, (tags || []).join(','), mood, body].join('\u0000');
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(src));
+    return Array.from(new Uint8Array(buf)).slice(0, 8)
+      .map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
   async function saveEntry() {
     const { dateStr } = editorState;
     const body = dom.editorTextarea.value;
@@ -732,7 +744,7 @@
 
     const title = dom.editorTitle.value.trim();
 
-    // ⚠既存の来歴（記録日時・入力ID・確認状態など）を保存経路で落とさない（2026-09-05）。
+    // ⚠既存の来歴（記録日時・入力ID など）を保存経路で落とさない（2026-09-05）。
     // 旧版は meta を date/title/tags/mood の4キーで作り直していたため、markdown.js の
     // serialize を直しても**ここで消えていた**（Codex再監査⑥・実関数テストで確認）。
     const KNOWN = ['date', 'title', 'tags', 'mood'];
@@ -744,15 +756,18 @@
     if (mood) meta.mood = mood;
     for (const [k, v] of Object.entries(existing)) {
       if (KNOWN.includes(k)) continue;
+      if (k === 'confirmed' || k === 'confirmed_at' || k === 'confirmed_version') continue;
       meta[k] = v;                       // 既知4キー以外は元の順で持ち越す
     }
 
-    // ⚠本文を変えたら confirmed を無条件で持ち越さない＝編集後は確認待ちへ戻す
-    const originalBody = editorState.originalBody;
-    if (originalBody !== undefined && originalBody !== body && 'confirmed' in meta) {
-      meta.confirmed = 'false';
-      meta.confirm_invalidated_at = new Date().toISOString();
-    }
+    // ⭐「確認して保存」＝**画面に出ている本文・タイトル・moodそのものを確定する操作**
+    //   （2026-09-05クロージング③）。entries/ は確定版という RULES の扱いに合わせる。
+    //   旧版は「本文変更ならfalse／タイトルだけ変更ならtrueのまま」で、
+    //   確定版フォルダに未確認が混ざり、古い確認が変更後の内容へ流用されていた。
+    //   ⚠確認前は保存しない＝下書きは localStorage 側で保持する（saveDraft）。
+    meta.confirmed = 'true';
+    meta.confirmed_at = new Date().toISOString();
+    meta.confirmed_version = await versionHash(dateStr, title, tags, mood, body);
 
     const content = Markdown.serialize(meta, body);
     const filePath = github.buildEntryPath(dateStr);
