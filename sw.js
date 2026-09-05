@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hito-journal-v2.10';
+const CACHE_NAME = 'hito-journal-v2.11';
 const ASSETS = [
   './',
   './index.html',

@@ -45,6 +45,20 @@ const Markdown = {
       lines.push(`tags: [${meta.tags.join(', ')}]`);
     }
     if (meta.mood) lines.push(`mood: ${meta.mood}`);
+    // ⚠未知のキーを落とさない（2026-09-05）。旧版は date/title/tags/mood だけを書き戻していたため、
+    // 来歴（記録日時・確認状態など）を足しても、アプリで1回保存すると黙って消えていた。
+    // 既知4キーの順序は従来どおり保ち、それ以外は元の順で末尾に残す。
+    const KNOWN = ['date', 'title', 'tags', 'mood'];
+    for (const key of Object.keys(meta)) {
+      if (KNOWN.includes(key)) continue;
+      const val = meta[key];
+      if (val === undefined || val === null || val === '') continue;
+      if (Array.isArray(val)) {
+        if (val.length > 0) lines.push(`${key}: [${val.join(', ')}]`);
+      } else {
+        lines.push(`${key}: ${val}`);
+      }
+    }
     lines.push('---');
     lines.push('');
     lines.push(body);
